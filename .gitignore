@@ -1,0 +1,9 @@
+.xcode/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.DS_Store
+Debug-iphoneos/
+Release-iphoneos/
+"Chiaki iOS.build/"
+Chiaki*.build/
