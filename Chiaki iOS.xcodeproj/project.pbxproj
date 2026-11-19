@@ -60,6 +60,7 @@
 		45128CF12A8828B600D6F2BA /* libiconv.tbd in Link Binary With Libraries */ = {isa = PBXBuildFile; fileRef = 45128CF02A8828B600D6F2BA /* libiconv.tbd */; };
 		45128CF32A88295600D6F2BA /* moc_mainwindow.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 45128CF22A88295600D6F2BA /* moc_mainwindow.cpp */; };
 		45128D052A882B3E00D6F2BA /* Media.xcassets in Copy Bundle Resources */ = {isa = PBXBuildFile; fileRef = 45128D042A882B3E00D6F2BA /* Media.xcassets */; };
+		45128D102A88309400D6F2BA /* PrivacyInfo.xcprivacy in Copy Bundle Resources */ = {isa = PBXBuildFile; fileRef = 45128D112A88309400D6F2BA /* PrivacyInfo.xcprivacy */; };
 		45128D072A88309400D6F2BA /* Settings.bundle in Copy Bundle Resources */ = {isa = PBXBuildFile; fileRef = 45128D062A88309400D6F2BA /* Settings.bundle */; };
 		45128D092A8830A300D6F2BA /* LaunchScreen.storyboard in Copy Bundle Resources */ = {isa = PBXBuildFile; fileRef = 45128D082A8830A300D6F2BA /* LaunchScreen.storyboard */; };
 		45F0F0672A8831DE005F82DA /* mainwindow.cpp in Compile Sources */ = {isa = PBXBuildFile; fileRef = 45F0F02C2A8831DD005F82DA /* mainwindow.cpp */; };
@@ -190,6 +191,7 @@
 		45128CF02A8828B600D6F2BA /* libiconv.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libiconv.tbd; path = usr/lib/libiconv.tbd; sourceTree = SDKROOT; };
 		45128CF22A88295600D6F2BA /* moc_mainwindow.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = moc_mainwindow.cpp; sourceTree = "<group>"; };
 		45128D042A882B3E00D6F2BA /* Media.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Media.xcassets; sourceTree = "<group>"; };
+		45128D112A88309400D6F2BA /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		45128D062A88309400D6F2BA /* Settings.bundle */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.plug-in"; path = Settings.bundle; sourceTree = "<group>"; };
 		45128D082A8830A300D6F2BA /* LaunchScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = LaunchScreen.storyboard; path = "Chiaki iOS.xcodeproj/LaunchScreen.storyboard"; sourceTree = "<group>"; };
 		45128D0A2A8830A800D6F2BA /* Default-568h@2x.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = "Default-568h@2x.png"; path = "Chiaki iOS.xcodeproj/Default-568h@2x.png"; sourceTree = "<group>"; };
@@ -447,6 +449,7 @@
 				45F0F0AF2A883413005F82DA /* discover-off-24px.svg */,
 				45128D082A8830A300D6F2BA /* LaunchScreen.storyboard */,
 				45128D062A88309400D6F2BA /* Settings.bundle */,
+				45128D112A88309400D6F2BA /* PrivacyInfo.xcprivacy */,
 			);
 			name = "Bundle Data";
 			sourceTree = "<group>";
@@ -599,6 +602,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				45128D072A88309400D6F2BA /* Settings.bundle in Copy Bundle Resources */,
+				45128D102A88309400D6F2BA /* PrivacyInfo.xcprivacy in Copy Bundle Resources */,
 				45F0F0BC2A883434005F82DA /* settings-20px.svg in Copy Bundle Resources */,
 				45F0F0B52A883413005F82DA /* console-ps4.svg in Copy Bundle Resources */,
 				45F0F0B42A883413005F82DA /* chiaki.svg in Copy Bundle Resources */,

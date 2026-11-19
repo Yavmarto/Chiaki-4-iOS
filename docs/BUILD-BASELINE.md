@@ -34,3 +34,8 @@ Dependencies (chiaki, FFmpeg, Opus, SDL2, OpenSSL, nanopb/jerasure) get built fr
 Minimum deployment target: set once Qt 6 is chosen (Qt 6.8 LTS requires iOS 16); verify against Apple's current App Store requirements.
 
 Hardware checks (PS4/PS5 registration, video, audio, controller, reconnect) are all still outstanding.
+
+## Privacy / local network (CEL-1717)
+- `NSLocalNetworkUsageDescription` added to Info.plist. No `NSBonjourServices`: discovery is raw UDP broadcast (chiaki lib), not Bonjour.
+- `PrivacyInfo.xcprivacy` added to Copy Bundle Resources: no tracking, UserDefaults reason CA92.1 (QSettings).
+- Multicast entitlement `com.apple.developer.networking.multicast` is NOT added: Apple must grant it per team/profile, and an unapproved entitlement breaks signing. Without it, UDP broadcast discovery may fail on device; manual host entry works. Request at developer.apple.com/contact/request/networking-multicast, then add the key to `chiaki.entitlements`. Note `chiaki.entitlements` is not yet wired via CODE_SIGN_ENTITLEMENTS.
