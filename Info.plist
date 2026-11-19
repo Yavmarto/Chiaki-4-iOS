@@ -20,6 +20,10 @@
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Chiaki finds your PlayStation on the local network and streams Remote Play to it.</string>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiresFullScreen</key>

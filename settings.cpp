@@ -187,7 +187,13 @@ void Settings::SetDecoder(Decoder decoder)
 
 QString Settings::GetHardwareDecoder() const
 {
-	return settings.value("settings/hw_decoder").toString();
+	auto v = settings.value("settings/hw_decoder").toString();
+#ifdef Q_OS_IOS
+	// Software HEVC decode runs on the network thread and stalls audio/input; use VideoToolbox unless "none" is chosen.
+	if(v.isEmpty())
+		return "videotoolbox";
+#endif
+	return v == "none" ? QString() : v;
 }
 
 void Settings::SetHardwareDecoder(const QString &hw_decoder)

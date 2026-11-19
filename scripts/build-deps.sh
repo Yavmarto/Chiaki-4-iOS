@@ -115,6 +115,9 @@ build_chiaki() {
   fetch chiaki
   # avcodec_close() was removed in FFmpeg 7 (avcodec_free_context already closes)
   sed -i '' '/avcodec_close(/d' "$WORK/src/chiaki/lib/src/ffmpegdecoder.c"
+  # pull_from_hw only unrefs the AVFrames it drops: leaks one AVFrame per frame with hw decode (VideoToolbox)
+  sed -i '' 's/av_frame_unref(sw_frame);/av_frame_free(\&sw_frame);/; s/av_frame_unref(hw_frame);/av_frame_free(\&hw_frame);/' \
+    "$WORK/src/chiaki/lib/src/ffmpegdecoder.c"
   # needs OpenSSL, Opus, FFmpeg for the same slice; build them first
   for d in openssl opus ffmpeg; do [ -d "$(prefix $d iphoneos)" ] || { echo "build $d first" >&2; exit 1; }; done
   local venv=$WORK/venv

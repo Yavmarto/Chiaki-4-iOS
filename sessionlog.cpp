@@ -81,7 +81,12 @@ static void LogCb(ChiakiLogLevel level, const char *msg, void *user)
 
 QString GetLogBaseDir()
 {
+	#ifdef Q_OS_IOS
+	// Documents is visible in the Files app (UIFileSharingEnabled), so testers can send session logs.
+	auto base_dir = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+#else
 	auto base_dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+#endif
 	if(base_dir.isEmpty())
 		return QString();
 

@@ -8,7 +8,6 @@
 #include <chiaki/log.h>
 
 #include <QOpenGLWidget>
-#include <QMutex>
 
 extern "C"
 {
@@ -18,8 +17,6 @@ extern "C"
 #define MAX_PANES 3
 
 class StreamSession;
-class AVOpenGLFrameUploader;
-class QOffscreenSurface;
 
 struct PlaneConfig
 {
@@ -39,17 +36,6 @@ struct ConversionConfig
 	struct PlaneConfig plane_configs[MAX_PANES];
 };
 
-struct AVOpenGLFrame
-{
-	GLuint pbo[MAX_PANES];
-	GLuint tex[MAX_PANES];
-	unsigned int width;
-	unsigned int height;
-	ConversionConfig *conversion_config;
-
-	bool Update(AVFrame *frame, ChiakiLog *log);
-};
-
 class AVOpenGLWidget: public QOpenGLWidget
 {
 	Q_OBJECT
@@ -61,13 +47,15 @@ class AVOpenGLWidget: public QOpenGLWidget
 		GLuint vbo;
 		GLuint vao;
 
-		AVOpenGLFrame frames[2];
-		int frame_fg;
-		QMutex frames_mutex;
-		QOffscreenSurface *frame_uploader_surface;
-		QOpenGLContext *frame_uploader_context;
-		AVOpenGLFrameUploader *frame_uploader;
-		QThread *frame_uploader_thread;
+		// ponytail: frames are pulled and uploaded on the GUI GL context in paintGL.
+		// The old background uploader thread + shared EAGL context showed no video on iOS.
+		GLuint tex[MAX_PANES];
+		unsigned int frame_width;
+		unsigned int frame_height;
+		bool gl_ok;
+		unsigned long frames_shown;
+
+		bool UploadFrame(AVFrame *frame);
 
 		QTimer *mouse_timer;
 
@@ -78,9 +66,6 @@ class AVOpenGLWidget: public QOpenGLWidget
 
 		explicit AVOpenGLWidget(StreamSession *session, QWidget *parent = nullptr, TransformMode transform_mode = TransformMode::Fit);
 		~AVOpenGLWidget() override;
-
-		void SwapFrames();
-		AVOpenGLFrame *GetBackgroundFrame()	{ return &frames[1 - frame_fg]; }
 
 		void SetTransformMode(TransformMode mode) { transform_mode = mode; }
 		TransformMode GetTransformMode() const { return transform_mode; }

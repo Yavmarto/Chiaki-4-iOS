@@ -275,6 +275,18 @@ void StreamSession::HandleKeyboardEvent(QKeyEvent *event)
 	if(event->isAutoRepeat())
 		return;
 
+#if defined(Q_OS_IOS) && CHIAKI_GUI_ENABLE_SDL_GAMECONTROLLER
+	// ponytail: iPadOS can mirror gamepad input as arrow/return key events; the default key map turns
+	// those into D-pad/Cross presses whose release may never arrive (cursor keeps flying sideways).
+	// While a gamepad is open, ignore key presses (releases still pass so nothing stays held).
+	// Make this a setting if someone needs keyboard + gamepad together.
+	if(!controllers.isEmpty() && event->type() == QEvent::Type::KeyPress)
+	{
+		CHIAKI_LOGI(log.GetChiakiLog(), "Ignoring key 0x%x while a gamepad is connected", event->key());
+		return;
+	}
+#endif
+
 	int button = key_map[Qt::Key(event->key())];
 	bool press_event = event->type() == QEvent::Type::KeyPress;
 

@@ -213,7 +213,7 @@ SettingsDialog::SettingsDialog(Settings *settings, QWidget *parent) : QDialog(pa
 #endif
 
 	hw_decoder_combo_box = new QComboBox(this);
-	hw_decoder_combo_box->addItem("none", QString());
+	hw_decoder_combo_box->addItem("none", QString("none"));
 	auto current_hw_decoder = settings->GetHardwareDecoder();
 	enum AVHWDeviceType hw_dev = AV_HWDEVICE_TYPE_NONE;
 	while(true)

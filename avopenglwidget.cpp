@@ -1,15 +1,19 @@
 // SPDX-License-Identifier: LicenseRef-AGPL-3.0-only-OpenSSL
 
 #include <avopenglwidget.h>
-#include <avopenglframeuploader.h>
 #include <streamsession.h>
 
-#include <QOffscreenSurface>
 #include <QOpenGLContext>
 #include <QOpenGLExtraFunctions>
 #include <QOpenGLDebugLogger>
-#include <QThread>
 #include <QTimer>
+
+#include <cstring>
+
+extern "C"
+{
+#include <libavutil/pixdesc.h>
+}
 
 #define MOUSE_TIMEOUT_MS 1000
 
@@ -147,10 +151,14 @@ AVOpenGLWidget::AVOpenGLWidget(StreamSession *session, QWidget *parent, Transfor
 
 	setFormat(CreateSurfaceFormat());
 
-	frame_uploader_context = nullptr;
-	frame_uploader = nullptr;
-	frame_uploader_thread = nullptr;
-	frame_fg = 0;
+	memset(tex, 0, sizeof(tex));
+	frame_width = frame_height = 0;
+	gl_ok = false;
+	frames_shown = 0;
+
+	CHIAKI_LOGI(session->GetChiakiLog(), "Video: pixel format %s", av_get_pix_fmt_name(pixel_format));
+	// Decoder signals from the network thread; queued to the GUI thread, update() coalesces.
+	connect(session, &StreamSession::FfmpegFrameAvailable, this, QOverload<>::of(&QWidget::update), Qt::QueuedConnection);
 
 	setMouseTracking(true);
 	mouse_timer = new QTimer(this);
@@ -160,15 +168,16 @@ AVOpenGLWidget::AVOpenGLWidget(StreamSession *session, QWidget *parent, Transfor
 
 AVOpenGLWidget::~AVOpenGLWidget()
 {
-	if(frame_uploader_thread)
+	if(gl_ok && context())
 	{
-		frame_uploader_thread->quit();
-		frame_uploader_thread->wait();
-		delete frame_uploader_thread;
+		makeCurrent();
+		auto f = context()->extraFunctions();
+		f->glDeleteTextures(conversion_config->planes, tex);
+		f->glDeleteBuffers(1, &vbo);
+		f->glDeleteVertexArrays(1, &vao);
+		f->glDeleteProgram(program);
+		doneCurrent();
 	}
-	delete frame_uploader;
-	delete frame_uploader_context;
-	delete frame_uploader_surface;
 }
 
 void AVOpenGLWidget::mouseMoveEvent(QMouseEvent *event)
@@ -188,60 +197,35 @@ void AVOpenGLWidget::HideMouse()
 	setCursor(Qt::BlankCursor);
 }
 
-void AVOpenGLWidget::SwapFrames()
-{
-	QMutexLocker lock(&frames_mutex);
-	frame_fg = 1 - frame_fg;
-	QMetaObject::invokeMethod(this, "update");
-}
-
-bool AVOpenGLFrame::Update(AVFrame *frame, ChiakiLog *log)
+bool AVOpenGLWidget::UploadFrame(AVFrame *frame)
 {
 	auto f = QOpenGLContext::currentContext()->extraFunctions();
 
 	if(frame->format != conversion_config->pixel_format)
 	{
-		CHIAKI_LOGE(log, "AVOpenGLFrame got AVFrame with invalid format");
+		CHIAKI_LOGE(session->GetChiakiLog(), "Video: got frame with format %s, expected %s",
+				av_get_pix_fmt_name((AVPixelFormat)frame->format), av_get_pix_fmt_name(conversion_config->pixel_format));
 		return false;
 	}
 
-	width = frame->width;
-	height = frame->height;
-
-	for(int i=0; i<conversion_config->planes; i++)
+	f->glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	for(unsigned int i=0; i<conversion_config->planes; i++)
 	{
-		int width = frame->width / conversion_config->plane_configs[i].width_divider;
-		int height = frame->height / conversion_config->plane_configs[i].height_divider;
-		int size = width * height * conversion_config->plane_configs[i].data_per_pixel;
-
-		f->glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo[i]);
-		f->glBufferData(GL_PIXEL_UNPACK_BUFFER, size, nullptr, GL_STREAM_DRAW);
-
-		auto buf = reinterpret_cast<uint8_t *>(f->glMapBufferRange(GL_PIXEL_UNPACK_BUFFER, 0, size, GL_MAP_WRITE_BIT | GL_MAP_INVALIDATE_BUFFER_BIT));
-		if(!buf)
-		{
-			CHIAKI_LOGE(log, "AVOpenGLFrame failed to map PBO");
-			continue;
-		}
-
-		if(frame->linesize[i] == width)
-			memcpy(buf, frame->data[i], size);
-		else
-		{
-			for(int l=0; l<height; l++)
-				memcpy(buf + width * l * conversion_config->plane_configs[i].data_per_pixel, frame->data[i] + frame->linesize[i] * l, width * conversion_config->plane_configs[i].data_per_pixel);
-		}
-
-		f->glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
-
+		const PlaneConfig &pc = conversion_config->plane_configs[i];
+		int w = (frame->width + pc.width_divider - 1) / pc.width_divider;
+		int h = (frame->height + pc.height_divider - 1) / pc.height_divider;
+		// ES3 row length lets GL skip the decoder's line padding, no copy needed
+		f->glPixelStorei(GL_UNPACK_ROW_LENGTH, frame->linesize[i] / pc.data_per_pixel);
 		f->glBindTexture(GL_TEXTURE_2D, tex[i]);
-		f->glTexImage2D(GL_TEXTURE_2D, 0, conversion_config->plane_configs[i].internal_format, width, height, 0, conversion_config->plane_configs[i].format, GL_UNSIGNED_BYTE, nullptr);
+		if(frame_width == (unsigned)frame->width && frame_height == (unsigned)frame->height)
+			f->glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, pc.format, GL_UNSIGNED_BYTE, frame->data[i]);
+		else
+			f->glTexImage2D(GL_TEXTURE_2D, 0, pc.internal_format, w, h, 0, pc.format, GL_UNSIGNED_BYTE, frame->data[i]);
 	}
+	f->glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 
-	f->glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-
-	f->glFinish();
-
+	frame_width = frame->width;
+	frame_height = frame->height;
 	return true;
 }
 
@@ -303,23 +287,17 @@ void AVOpenGLWidget::initializeGL()
 		return;
 	}
 
-	for(int i=0; i<2; i++)
+	frame_width = frame_height = 0; // fresh 1x1 textures below, next frame must re-specify them
+	f->glGenTextures(conversion_config->planes, tex);
+	uint8_t uv_default[] = {0x7f, 0x7f};
+	for(unsigned int j=0; j<conversion_config->planes; j++)
 	{
-		frames[i].conversion_config = conversion_config;
-		f->glGenTextures(conversion_config->planes, frames[i].tex);
-		f->glGenBuffers(conversion_config->planes, frames[i].pbo);
-		uint8_t uv_default[] = {0x7f, 0x7f};
-		for(int j=0; j<conversion_config->planes; j++)
-		{
-			f->glBindTexture(GL_TEXTURE_2D, frames[i].tex[j]);
-			f->glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-			f->glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-			f->glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-			f->glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-			f->glTexImage2D(GL_TEXTURE_2D, 0, conversion_config->plane_configs[j].internal_format, 1, 1, 0, conversion_config->plane_configs[j].format, GL_UNSIGNED_BYTE, j > 0 ? uv_default : nullptr);
-		}
-		frames[i].width = 0;
-		frames[i].height = 0;
+		f->glBindTexture(GL_TEXTURE_2D, tex[j]);
+		f->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		f->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		f->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		f->glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		f->glTexImage2D(GL_TEXTURE_2D, 0, conversion_config->plane_configs[j].internal_format, 1, 1, 0, conversion_config->plane_configs[j].format, GL_UNSIGNED_BYTE, j > 0 ? uv_default : nullptr);
 	}
 
 	f->glUseProgram(program);
@@ -346,26 +324,7 @@ void AVOpenGLWidget::initializeGL()
 	f->glEnable(GL_CULL_FACE);
 	f->glClearColor(0.0, 0.0, 0.0, 0.0);
 
-	frame_uploader_context = new QOpenGLContext(nullptr);
-	frame_uploader_context->setFormat(context()->format());
-	frame_uploader_context->setShareContext(context());
-	if(!frame_uploader_context->create())
-	{
-		CHIAKI_LOGE(session->GetChiakiLog(), "Failed to create upload OpenGL context");
-		return;
-	}
-
-	frame_uploader_surface = new QOffscreenSurface();
-	frame_uploader_surface->setFormat(context()->format());
-	frame_uploader_surface->create();
-	frame_uploader = new AVOpenGLFrameUploader(session, this, frame_uploader_context, frame_uploader_surface);
-	frame_fg = 0;
-
-	frame_uploader_thread = new QThread(this);
-	frame_uploader_thread->setObjectName("Frame Uploader");
-	frame_uploader_context->moveToThread(frame_uploader_thread);
-	frame_uploader->moveToThread(frame_uploader_thread);
-	frame_uploader_thread->start();
+	gl_ok = true;
 }
 
 void AVOpenGLWidget::paintGL()
@@ -373,22 +332,28 @@ void AVOpenGLWidget::paintGL()
 	auto f = QOpenGLContext::currentContext()->extraFunctions();
 
 	f->glClear(GL_COLOR_BUFFER_BIT);
+	if(!gl_ok)
+		return;
+
+	if(AVFrame *next_frame = chiaki_ffmpeg_decoder_pull_frame(session->GetFfmpegDecoder()))
+	{
+		if(UploadFrame(next_frame) && frames_shown++ == 0)
+			CHIAKI_LOGI(session->GetChiakiLog(), "Video: first frame %dx%d uploaded (GL error 0x%x)", next_frame->width, next_frame->height, f->glGetError());
+		av_frame_free(&next_frame);
+	}
 
 	int widget_width = (int)(width() * devicePixelRatioF());
 	int widget_height = (int)(height() * devicePixelRatioF());
 
-	QMutexLocker lock(&frames_mutex);
-	AVOpenGLFrame *frame = &frames[frame_fg];
-
 	GLsizei vp_width, vp_height;
-	if(!frame->width || !frame->height)
+	if(!frame_width || !frame_height)
 	{
 		vp_width = widget_width;
 		vp_height = widget_height;
 	}
 	else if(transform_mode == TransformMode::Fit)
 	{
-		float aspect = (float)frame->width / (float)frame->height;
+		float aspect = (float)frame_width / (float)frame_height;
 		if(widget_height && aspect < (float)widget_width / (float)widget_height)
 		{
 			vp_height = widget_height;
@@ -402,7 +367,7 @@ void AVOpenGLWidget::paintGL()
 	}
 	else if(transform_mode == TransformMode::Zoom)
 	{
-		float aspect = (float)frame->width / (float)frame->height;
+		float aspect = (float)frame_width / (float)frame_height;
 		if(widget_height && aspect < (float)widget_width / (float)widget_height)
 		{
 			vp_width = widget_width;
@@ -416,7 +381,7 @@ void AVOpenGLWidget::paintGL()
 	}
 	else // transform_mode == TransformMode::Stretch
 	{
-		float aspect = (float)frame->width / (float)frame->height;
+		float aspect = (float)frame_width / (float)frame_height;
 		if(widget_height && aspect < (float)widget_width / (float)widget_height)
 		{
 			vp_height = widget_height;
@@ -431,13 +396,15 @@ void AVOpenGLWidget::paintGL()
 
 	f->glViewport((widget_width - vp_width) / 2, (widget_height - vp_height) / 2, vp_width, vp_height);
 
-	for(int i=0; i<3; i++)
+	f->glUseProgram(program);
+	f->glBindVertexArray(vao);
+	for(unsigned int i=0; i<conversion_config->planes; i++)
 	{
 		f->glActiveTexture(GL_TEXTURE0 + i);
-		f->glBindTexture(GL_TEXTURE_2D, frame->tex[i]);
+		f->glBindTexture(GL_TEXTURE_2D, tex[i]);
 	}
 
 	f->glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-	f->glFinish();
+	f->glBindVertexArray(0);
+	f->glActiveTexture(GL_TEXTURE0);
 }
