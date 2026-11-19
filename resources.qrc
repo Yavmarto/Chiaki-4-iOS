@@ -1,0 +1,11 @@
+<RCC>
+  <qresource prefix="/icons">
+    <file alias="settings-20px.svg">icons/settings-20px.svg</file>
+    <file alias="add-24px.svg">icons/add-24px.svg</file>
+    <file alias="discover-24px.svg">icons/discover-24px.svg</file>
+    <file alias="discover-off-24px.svg">icons/discover-off-24px.svg</file>
+    <file alias="chiaki.svg">icons/chiaki.svg</file>
+    <file alias="console-ps4.svg">icons/console-ps4.svg</file>
+    <file alias="console-ps5.svg">icons/console-ps5.svg</file>
+  </qresource>
+</RCC>

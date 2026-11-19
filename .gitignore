@@ -7,3 +7,5 @@ Debug-iphoneos/
 Release-iphoneos/
 "Chiaki iOS.build/"
 Chiaki*.build/
+build/
+Frameworks/

@@ -8,7 +8,6 @@
 #include <chiaki/base64.h>
 
 #include <QKeyEvent>
-#include <QAudioOutput.h>
 
 #include <cstring>
 #include <chiaki/session.h>
@@ -65,7 +64,6 @@ StreamSession::StreamSession(const StreamSessionConnectInfo &connect_info, QObje
 #if CHIAKI_LIB_ENABLE_PI_DECODER
 	pi_decoder(nullptr),
 #endif
-	audio_output(nullptr),
 	audio_io(0),
 	haptics_output(0),
 	haptics_resampler_buf(nullptr)
@@ -102,19 +100,6 @@ StreamSession::StreamSession(const StreamSessionConnectInfo &connect_info, QObje
 #if CHIAKI_LIB_ENABLE_PI_DECODER
 	}
 #endif
-
-	audio_out_device_info = QAudioDeviceInfo::defaultOutputDevice();
-	if(!connect_info.audio_out_device.isEmpty())
-	{
-		for(QAudioDeviceInfo di : QAudioDeviceInfo::availableDevices(QAudio::AudioOutput))
-		{
-			if(di.deviceName() == connect_info.audio_out_device)
-			{
-				audio_out_device_info = di;
-				break;
-			}
-		}
-	}
 
 	chiaki_opus_decoder_init(&opus_decoder, log.GetChiakiLog());
 	audio_buffer_size = connect_info.audio_buffer_size;
@@ -400,8 +385,6 @@ void StreamSession::SendFeedbackState()
 
 void StreamSession::InitAudio(unsigned int channels, unsigned int rate)
 {
-	delete audio_output;
-	audio_output = nullptr;
 	audio_io = 0;
     
     SDL_AudioSpec wanted;

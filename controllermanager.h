@@ -4,6 +4,7 @@
 #define CHIAKI_CONTROLLERMANAGER_H
 
 #include <chiaki/controller.h>
+#include <chiaki/orientation.h>
 
 #include <QObject>
 #include <QSet>

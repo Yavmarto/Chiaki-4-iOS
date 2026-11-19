@@ -19,8 +19,7 @@
 #include <QMap>
 #include <QCheckBox>
 #include <QLineEdit>
-#include <QtConcurrent>
-#include <QFutureWatcher>
+#include <SDL.h>
 
 #include <chiaki/config.h>
 #include <chiaki/ffmpegdecoder.h>
@@ -100,32 +99,20 @@ SettingsDialog::SettingsDialog(Settings *settings, QWidget *parent) : QDialog(pa
 
 	audio_device_combo_box = new QComboBox(this);
 	audio_device_combo_box->addItem(tr("Auto"));
-	auto current_audio_device = settings->GetAudioOutDevice();
-	if(!current_audio_device.isEmpty())
-	{
-		// temporarily add the selected device before async fetching is done
-		audio_device_combo_box->addItem(current_audio_device, current_audio_device);
-		audio_device_combo_box->setCurrentIndex(1);
-	}
 	connect(audio_device_combo_box, QOverload<int>::of(&QComboBox::activated), this, [this](){
 		this->settings->SetAudioOutDevice(audio_device_combo_box->currentData().toString());
 	});
 
-	// do this async because it's slow, assuming availableDevices() is thread-safe
-	auto audio_devices_future = QtConcurrent::run([]() {
-		return QAudioDeviceInfo::availableDevices(QAudio::AudioOutput);
-	});
-	auto audio_devices_future_watcher = new QFutureWatcher<QList<QAudioDeviceInfo>>(this);
-	connect(audio_devices_future_watcher, &QFutureWatcher<QList<QAudioDeviceInfo>>::finished, this, [this, audio_devices_future_watcher, settings]() {
-		auto available_devices = audio_devices_future_watcher->result();
-		while(audio_device_combo_box->count() > 1) // remove all but "Auto"
-			audio_device_combo_box->removeItem(1);
-		for(QAudioDeviceInfo di : available_devices)
-			audio_device_combo_box->addItem(di.deviceName(), di.deviceName());
-		int audio_out_device_index = audio_device_combo_box->findData(settings->GetAudioOutDevice());
-		audio_device_combo_box->setCurrentIndex(audio_out_device_index < 0 ? 0 : audio_out_device_index);
-	});
-	audio_devices_future_watcher->setFuture(audio_devices_future);
+	if(SDL_InitSubSystem(SDL_INIT_AUDIO) == 0)
+	{
+		for(int i=0; i<SDL_GetNumAudioDevices(0); i++)
+		{
+			QString name = QString::fromUtf8(SDL_GetAudioDeviceName(i, 0));
+			audio_device_combo_box->addItem(name, name);
+		}
+	}
+	int audio_out_device_index = audio_device_combo_box->findData(settings->GetAudioOutDevice());
+	audio_device_combo_box->setCurrentIndex(audio_out_device_index < 0 ? 0 : audio_out_device_index);
 	general_layout->addRow(tr("Audio Output Device:"), audio_device_combo_box);
 
 	auto about_button = new QPushButton(tr("About Chiaki"), this);

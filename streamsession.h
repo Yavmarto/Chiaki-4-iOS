@@ -28,7 +28,6 @@
 #include <QTimer>
 #include <SDL.h>
 
-class QAudioOutput;
 class QIODevice;
 class QKeyEvent;
 class Settings;
@@ -99,9 +98,7 @@ class StreamSession : public QObject
 		ChiakiPiDecoder *pi_decoder;
 #endif
 
-		QAudioDeviceInfo audio_out_device_info;
 		unsigned int audio_buffer_size;
-		QAudioOutput *audio_output;
         SDL_AudioDeviceID audio_io;
 		SDL_AudioDeviceID haptics_output;
 		uint8_t *haptics_resampler_buf;
