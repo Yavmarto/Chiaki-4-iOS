@@ -7,6 +7,8 @@ Record pass/fail, device, iOS version, console, firmware.
 - [ ] Local network permission prompt appears; allowing it works
 - [ ] Add console manually by IP (manual host)
 - [ ] Register with PSN account ID + PIN (PS4 and/or PS5)
+- [ ] With discovery disabled, the manual console changes from Register to Connect after successful registration and still shows Connect after relaunch
+- [ ] An older manual console that still shows Register can be linked to its saved credentials through Edit and Registered Console without entering another PIN
 - [ ] Stream starts; video renders via VideoToolbox (no green/black frames)
 - [ ] SDL audio plays, no crackle or drift over 5 min
 - [ ] Controller (MFi/DualShock/DualSense) input works in game

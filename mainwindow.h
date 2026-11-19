@@ -52,7 +52,7 @@ class MainWindow : public QMainWindow
 	private slots:
 		void ServerItemWidgetSelected();
 		void ServerItemWidgetTriggered();
-		void ServerItemWidgetDeleteTriggered(const DisplayServer *server);
+		void ServerItemWidgetEditTriggered();
 		void ServerItemWidgetWakeTriggered();
 
 		void UpdateDiscoveryEnabled();

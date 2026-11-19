@@ -273,38 +273,37 @@ void MainWindow::ServerItemWidgetTriggered()
     }
     else
     {
-        auto const regist_dialog = new RegistDialog(settings, server.GetHostAddr(), this);
+        auto regist_dialog = new RegistDialog(settings, server.GetHostAddr(), this, !server.discovered);
+        regist_dialog->setAttribute(Qt::WA_DeleteOnClose);
         auto policy = regist_dialog->sizePolicy();
         policy.setVerticalStretch(20);
         regist_dialog->setSizePolicy(policy);
-        connect(regist_dialog, &RegistDialog::DeleteTriggered, this, [this, server, regist_dialog]() {
-            MainWindow::ServerItemWidgetDeleteTriggered(&server);
-            regist_dialog->hide();
-        }, Qt::QueuedConnection);
-        regist_dialog->show();
-//        if(r == QDialog::Accepted && !server.discovered) // success
-//        {
-//            ManualHost manual_host = server.manual_host;
-//            manual_host.Register(regist_dialog->GetRegisteredHost());
-//            settings->SetManualHost(manual_host);
-//        }
+        if(!server.discovered)
+        {
+            const int id = server.manual_host.GetID();
+            connect(regist_dialog, &RegistDialog::RegistrationSucceeded, this,
+                    [this, id](const RegisteredHost &host, const QString &address) {
+                if(settings->GetManualHostExists(id))
+                    settings->SetManualHost(ManualHost(id, address, true, host.GetServerMAC()));
+            });
+            connect(regist_dialog, &RegistDialog::DeleteTriggered, regist_dialog, [this, id, regist_dialog]() {
+                settings->RemoveManualHost(id);
+                regist_dialog->reject();
+            }, Qt::QueuedConnection);
+        }
+        regist_dialog->open();
     }
 }
 
-void dialogIsFinished(int result){ //this is a slot
-   if(result == QDialog::Accepted){
-       //do something
-       return;
-   }
-   //do another thing
-}
-
-void MainWindow::ServerItemWidgetDeleteTriggered(const DisplayServer *server)
+void MainWindow::ServerItemWidgetEditTriggered()
 {
-    if(server->discovered)
+    auto server = DisplayServerFromSender();
+    if(!server || server->discovered)
         return;
 
-    settings->RemoveManualHost(server->manual_host.GetID());
+    auto dialog = new ManualHostDialog(settings, server->manual_host.GetID(), this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->open();
 }
 
 void MainWindow::ServerItemWidgetWakeTriggered()
@@ -385,6 +384,7 @@ void MainWindow::UpdateServerWidgets()
         auto widget = new ServerItemWidget(grid_widget);
         connect(widget, &ServerItemWidget::Selected, this, &MainWindow::ServerItemWidgetSelected);
         connect(widget, &ServerItemWidget::Triggered, this, &MainWindow::ServerItemWidgetTriggered);
+        connect(widget, &ServerItemWidget::EditTriggered, this, &MainWindow::ServerItemWidgetEditTriggered);
         connect(widget, &ServerItemWidget::WakeTriggered, this, &MainWindow::ServerItemWidgetWakeTriggered);
         server_item_widgets.append(widget);
         grid_widget->AddWidget(widget);

@@ -4,6 +4,7 @@
 #include <settings.h>
 
 #include <QFormLayout>
+#include <QFontDatabase>
 #include <QLineEdit>
 #include <QRegularExpressionValidator>
 #include <QDialogButtonBox>
@@ -13,6 +14,7 @@
 #include <QMessageBox>
 #include <QCheckBox>
 #include <QRadioButton>
+#include <QVBoxLayout>
 
 Q_DECLARE_METATYPE(ChiakiLogLevel)
 
@@ -20,7 +22,7 @@ Q_DECLARE_METATYPE(ChiakiLogLevel)
 
 static const QRegularExpression pin_re(QString("[0-9]").repeated(PIN_LENGTH));
 
-RegistDialog::RegistDialog(Settings *settings, const QString &host, QWidget *parent)
+RegistDialog::RegistDialog(Settings *settings, const QString &host, QWidget *parent, bool allow_delete)
 	: QDialog(parent),
 	settings(settings)
 {
@@ -82,13 +84,15 @@ RegistDialog::RegistDialog(Settings *settings, const QString &host, QWidget *par
 	form_layout->addRow(pin_edit);
     
 	button_box = new QDialogButtonBox(QDialogButtonBox::Cancel, this);
-    register_button = button_box->addButton(tr("Register"), QDialogButtonBox::AcceptRole);
-    auto const delete_button = new QPushButton(tr("Delete"), this);
-    button_box->addButton(delete_button, QDialogButtonBox::NoRole);
+	register_button = button_box->addButton(tr("Register"), QDialogButtonBox::AcceptRole);
+	if(allow_delete)
+	{
+		auto delete_button = button_box->addButton(tr("Delete"), QDialogButtonBox::ActionRole);
+		connect(delete_button, &QPushButton::clicked, this, &RegistDialog::DeleteTriggered);
+	}
 	layout->addWidget(button_box);
-    connect(button_box, &QDialogButtonBox::accepted, this, &QDialog::accept);
+	connect(button_box, &QDialogButtonBox::accepted, this, &QDialog::accept);
 	connect(button_box, &QDialogButtonBox::rejected, this, &QDialog::reject);
-    connect(delete_button, &QPushButton::clicked, this, [this]{ emit DeleteTriggered(); });
     
 	connect(host_edit, &QLineEdit::textChanged, this, &RegistDialog::ValidateInput);
 	connect(psn_online_id_edit, &QLineEdit::textChanged, this, &RegistDialog::ValidateInput);
@@ -118,7 +122,8 @@ void RegistDialog::ValidateInput()
 void RegistDialog::accept()
 {
 	ChiakiRegistInfo info = {};
-	QByteArray host = host_edit->text().trimmed().toUtf8();
+	const QString address = host_edit->text().trimmed();
+	QByteArray host = address.toUtf8();
 	info.host = host.constData();
 
 	if(ps4_pre9_radio_button->isChecked())
@@ -154,14 +159,13 @@ void RegistDialog::accept()
 	info.broadcast = broadcast_check_box->isChecked();
 	info.pin = (uint32_t)pin_edit->text().toULong();
 
-	auto const execute_dialog = new RegistExecuteDialog(settings, info, this);
-    execute_dialog->show();
-//	 int r = execute_dialog.exec();
-//	 if(r == QDialog::Accepted)
-//	 {
-//		this->registered_host = execute_dialog.GetRegisteredHost();
-//		QDialog::accept();
-//	}
+	auto execute_dialog = new RegistExecuteDialog(settings, info, this);
+	execute_dialog->setAttribute(Qt::WA_DeleteOnClose);
+	connect(execute_dialog, &QDialog::accepted, this, [this, execute_dialog, address]() {
+		emit RegistrationSucceeded(execute_dialog->GetRegisteredHost(), address);
+		QDialog::accept();
+	});
+	execute_dialog->open();
 }
 
 static void RegistExecuteDialogLogCb(ChiakiLogLevel level, const char *msg, void *user);
@@ -185,7 +189,13 @@ RegistExecuteDialog::RegistExecuteDialog(Settings *settings, const ChiakiRegistI
 	connect(button_box, &QDialogButtonBox::rejected, this, &QDialog::reject);
 
 	chiaki_log_init(&log, settings->GetLogLevelMask(), RegistExecuteDialogLogCb, this);
-	chiaki_regist_start(&regist, &log, &regist_info, RegistExecuteDialogRegistCb, this);
+	const auto error = chiaki_regist_start(&regist, &log, &regist_info, RegistExecuteDialogRegistCb, this);
+	regist_started = error == CHIAKI_ERR_SUCCESS;
+	if(!regist_started)
+	{
+		Log(CHIAKI_LOG_ERROR, QString::fromUtf8(chiaki_error_string(error)));
+		Finished();
+	}
 
 	setWindowTitle(tr("Register Console"));
 	resize(600, 400);
@@ -193,8 +203,11 @@ RegistExecuteDialog::RegistExecuteDialog(Settings *settings, const ChiakiRegistI
 
 RegistExecuteDialog::~RegistExecuteDialog()
 {
-	chiaki_regist_stop(&regist);
-	chiaki_regist_fini(&regist);
+	if(regist_started)
+	{
+		chiaki_regist_stop(&regist);
+		chiaki_regist_fini(&regist);
+	}
 }
 
 void RegistExecuteDialog::Log(ChiakiLogLevel level, QString msg)
@@ -214,6 +227,9 @@ void RegistExecuteDialog::Finished()
 
 void RegistExecuteDialog::Success(RegisteredHost host)
 {
+	if(!isVisible())
+		return;
+
 	CHIAKI_LOGI(&log, "Successfully registered %s", host.GetServerNickname().toLocal8Bit().constData());
 	this->registered_host = host;
 

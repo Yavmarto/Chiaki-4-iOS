@@ -36,23 +36,20 @@ class RegistDialog : public QDialog
 		QDialogButtonBox *button_box;
 		QPushButton *register_button;
 
-		RegisteredHost registered_host;
-
 		bool NeedAccountId();
 
 	private slots:
 		void ValidateInput();
 
 	public:
-		explicit RegistDialog(Settings *settings, const QString &host = QString(), QWidget *parent = nullptr);
+		explicit RegistDialog(Settings *settings, const QString &host = QString(), QWidget *parent = nullptr, bool allow_delete = false);
 		~RegistDialog();
-
-		RegisteredHost GetRegisteredHost() { return registered_host; }
 
 	public slots:
 		void accept() override;
     
     signals:
+        void RegistrationSucceeded(const RegisteredHost &host, const QString &address);
         void DeleteTriggered();
 };
 
@@ -67,6 +64,7 @@ class RegistExecuteDialog: public QDialog
 
 		ChiakiLog log;
 		ChiakiRegist regist;
+		bool regist_started;
 
 		QPlainTextEdit *log_edit;
 		QDialogButtonBox *button_box;

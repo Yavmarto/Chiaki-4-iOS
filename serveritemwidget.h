@@ -6,6 +6,7 @@
 #include <QFrame>
 
 class QLabel;
+class QPushButton;
 
 class ServerIconWidget;
 struct DisplayServer;
@@ -20,6 +21,8 @@ class ServerItemWidget : public QFrame
 		QLabel *top_label;
 		QLabel *bottom_label;
 		ServerIconWidget *icon_widget;
+		QPushButton *connect_button;
+		QPushButton *edit_button;
 
 		QAction *delete_action;
 		QAction *wake_action;
@@ -39,6 +42,7 @@ class ServerItemWidget : public QFrame
 	signals:
 		void Selected();
 		void Triggered();
+		void EditTriggered();
 		void WakeTriggered();
 };
 

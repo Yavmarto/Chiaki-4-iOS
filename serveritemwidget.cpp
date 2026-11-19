@@ -9,6 +9,7 @@
 #include <QStyle>
 #include <QMouseEvent>
 #include <QAction>
+#include <QPushButton>
 
 ServerItemWidget::ServerItemWidget(QWidget *parent) : QFrame(parent)
 {
@@ -29,6 +30,15 @@ ServerItemWidget::ServerItemWidget(QWidget *parent) : QFrame(parent)
 	bottom_label->setAlignment(Qt::AlignCenter);
 	bottom_label->setWordWrap(true);
 	layout->addWidget(bottom_label);
+
+	auto buttons = new QHBoxLayout();
+	layout->addLayout(buttons);
+	connect_button = new QPushButton(this);
+	buttons->addWidget(connect_button);
+	connect(connect_button, &QPushButton::clicked, this, &ServerItemWidget::Triggered);
+	edit_button = new QPushButton(tr("Edit"), this);
+	buttons->addWidget(edit_button);
+	connect(edit_button, &QPushButton::clicked, this, &ServerItemWidget::EditTriggered);
 
 	setContextMenuPolicy(Qt::ActionsContextMenu);
 
@@ -62,6 +72,8 @@ void ServerItemWidget::SetSelected(bool selected)
 void ServerItemWidget::Update(const DisplayServer &display_server)
 {
 	wake_action->setEnabled(display_server.registered);
+	connect_button->setText(display_server.registered ? tr("Connect") : tr("Register"));
+	edit_button->setVisible(!display_server.discovered);
 
 	icon_widget->SetState(display_server.IsPS5(),
 			display_server.discovered ? display_server.discovery_host.state : CHIAKI_DISCOVERY_HOST_STATE_UNKNOWN);

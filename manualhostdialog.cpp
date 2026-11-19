@@ -18,7 +18,7 @@ ManualHostDialog::ManualHostDialog(Settings *settings, int id, QWidget *parent)
 	this->settings = settings;
 	host_id = id;
 
-	setWindowTitle(tr("Add Manual Console"));
+	setWindowTitle(id >= 0 ? tr("Edit Manual Console") : tr("Add Manual Console"));
 
 	ManualHost host;
 	if(id >= 0 && settings->GetManualHostExists(id))
@@ -45,7 +45,11 @@ ManualHostDialog::ManualHostDialog(Settings *settings, int id, QWidget *parent)
 	registered_host_combo_box->addItem(tr("Register on first Connection"));
 	auto registered_hosts = settings->GetRegisteredHosts();
 	for(const auto &registered_host : registered_hosts)
+	{
 		registered_host_combo_box->addItem(QString("%1 (%2)").arg(registered_host.GetServerMAC().ToString(), registered_host.GetServerNickname()), QVariant::fromValue(registered_host.GetServerMAC()));
+		if(host.GetRegistered() && registered_host.GetServerMAC() == host.GetMAC())
+			registered_host_combo_box->setCurrentIndex(registered_host_combo_box->count() - 1);
+	}
     
     auto registered_host_combo_box_label = new QLabel();
     registered_host_combo_box_label->setText("Registered Console:");
@@ -76,6 +80,12 @@ void ManualHostDialog::ButtonClicked(QAbstractButton *button)
 
 void ManualHostDialog::accept()
 {
+	if(host_id >= 0 && !settings->GetManualHostExists(host_id))
+	{
+		reject();
+		return;
+	}
+
 	bool registered = false;
 	HostMAC registered_mac;
 	QVariant registered_host_data = registered_host_combo_box->currentData();

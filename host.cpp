@@ -5,6 +5,7 @@
 #include <QSettings>
 
 RegisteredHost::RegisteredHost()
+	: target(CHIAKI_TARGET_PS4_10), rp_key_type(0)
 {
 	memset(rp_regist_key, 0, sizeof(rp_regist_key));
 	memset(rp_key, 0, sizeof(rp_key));
